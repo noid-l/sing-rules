@@ -1,24 +1,8 @@
 [
   {
-    "name": "🌸 NanoCloud",
+    "name": "🌐 Ghelper",
     "cost": 1.0,
     "path": "dat/nanocloud.json",
     "format": "sing-box"
-  },
-  {
-    "name": "👻 Ash",
-    "cost": 1.0,
-    "path": "dat/ash.b64",
-    "format": "shadowrocket",
-    "emby": {
-      "domain": ["ask.ash.yt", "tv.ash.yt"],
-      "exclude": ["美国", "日本", "动态"],
-      "url": "https://tv.ash.yt/favicon.ico"
-    }
-  },
-  {
-    "name": "☁️ XipCloud",
-    "cost": -1.0,
-    "path": "dat/xipcloud.yaml"
   }
 ]
