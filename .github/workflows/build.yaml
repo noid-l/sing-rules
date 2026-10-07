@@ -21,17 +21,19 @@ jobs:
           echo "TAG=$(env TZ=Asia/Shanghai date +%Y%m%d%H%M)" | tee -a "$GITHUB_ENV"
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 10
 
       - name: Checkout Rules
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: Loyalsoldier/v2ray-rules-dat
           path: dat
           ref: release
 
       - name: Restore subscribe cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: cache
           key: subscribe-${{ hashFiles('config/subscribe.json') }}-${{ github.run_id }}
@@ -72,14 +74,14 @@ jobs:
 
       - name: Checkout geo
         if: env.BUILD_RULES == 1
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MetaCubeX/geo
           path: geo
 
       - name: Setup Go
         if: env.BUILD_RULES == 1
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: geo/go.mod
           cache-dependency-path: geo/go.sum
@@ -98,7 +100,7 @@ jobs:
           sing-box version
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -118,9 +120,16 @@ jobs:
         run: ./build-sing-rules.sh
 
       - name: Commit and Push (private)
+        id: commit_push_private
         continue-on-error: true
         run: ../commit-and-push.sh "Update config"
         working-directory: private
+
+      - name: Trim private history
+        if: steps.commit_push_private.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: ./trim-history.sh private
 
       - name: Commit and Push
         id: commit_push
@@ -132,20 +141,10 @@ jobs:
 
       - name: Release
         if: env.BUILD_RULES == 1 && steps.commit_push.outcome == 'success'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
           files: rules/*
           draft: false
           prerelease: false
           make_latest: "true"
-
-      - name: Setup Node
-        if: env.BUILD_RULES == 1 && steps.commit_push.outcome == 'success'
-        uses: actions/setup-node@v6
-        with:
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Publish to npmjs
-        if: env.BUILD_RULES == 1 && steps.commit_push.outcome == 'success'
-        run: ./npm-publish.sh  "${{ env.TAG }}"

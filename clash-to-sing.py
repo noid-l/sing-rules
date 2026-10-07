@@ -4,6 +4,7 @@ import ipaddress
 import json
 import re
 from datetime import datetime
+from math import inf
 from pathlib import Path
 from typing import Annotated, Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
@@ -23,9 +24,11 @@ from common import (
     simplify_dict,
     yaml,
 )
+from common.certificate import attach_certificates
 from common.io import open_path
 from common.object import as_hashable, copy_without_tag
 from common.outbound import safe_find_country
+from common.sort import sort_by_variant
 
 __FLAG_MAP = {
     "AR": "🇦🇷",
@@ -517,10 +520,19 @@ def proxies_to_outbound(
         costs = {"⛰️ Gingkoo": 0, "🧅 Tor Browser": 0}
 
     outbounds.append({"type": "http", "tag": "🐱 LazyCat", "server": "127.0.0.1", "server_port": 31085})
-    outbounds.append({"type": "http", "tag": "💻 中间人", "server": "127.0.0.1", "server_port": 7899})
-    outbounds.append({"type": "http", "tag": "🏢 中间人", "server": "10.2.20.160", "server_port": 7899})
-    outbounds.append({"type": "http", "tag": "🏠 中间人 Wi-Fi", "server": "192.168.50.78", "server_port": 7899})
-    outbounds.append({"type": "http", "tag": "🏠 中间人 Wired", "server": "192.168.50.80", "server_port": 7899})
+    outbounds.append({"type": "http", "tag": "🌀 Localhost", "server": "127.0.0.1", "server_port": 7899})
+    outbounds.append(
+        {
+            "type": "http",
+            "tag": "💻 MacbookPro",
+            "server": "moons-macbook-m2.local",
+            "server_port": 7899,
+            "domain_resolver": {"server": "dns-local", "strategy": "ipv4_only"},
+        }
+    )
+    outbounds.append({"type": "http", "tag": "💻 MacbookPro Office", "server": "10.2.20.199", "server_port": 7899})
+    outbounds.append({"type": "http", "tag": "💻 MacbookPro Wi-Fi", "server": "192.168.50.78", "server_port": 7899})
+    outbounds.append({"type": "http", "tag": "💻 MacbookPro Wired", "server": "192.168.50.80", "server_port": 7899})
 
     seen = set()
     providers = {}
@@ -664,12 +676,18 @@ def proxies_to_outbound(
 
     ai_tags = prioritize(proxy_tags, "🇺🇸 美国节点")
     playstation_tags = prioritize(proxy_tags, "🇭🇰 香港节点")
-    youtube_tags = prioritize(proxy_tags, "🇮🇳 印度节点")
 
     lazycat_tags = ["DIRECT", "🐱 LazyCat"]
-    mitm_tags = ["DIRECT", "💻 中间人", "🏢 中间人", "🏠 中间人 Wi-Fi", "🏠 中间人 Wired"]
+    mitm_tags = [
+        "DIRECT",
+        "🌀 Localhost",
+        "💻 MacbookPro",
+        "💻 MacbookPro Office",
+        "💻 MacbookPro Wi-Fi",
+        "💻 MacbookPro Wired",
+    ]
 
-    outbounds.append(selector("🤖 AI", ai_tags))
+    outbounds.append(selector("🤖 AI", ["🤖 自然选择 AI", *ai_tags]))
     outbounds.append(selector("🤖 Claude", ["🤖 自然选择 Claude", *ai_tags]))
     outbounds.append(selector("🤖 ChatGPT", ["🤖 自然选择 ChatGPT", *ai_tags]))
 
@@ -691,7 +709,7 @@ def proxies_to_outbound(
     outbounds.append(selector("🎥 Disney+", proxy_tags))
     outbounds.append(selector("🎥 Netflix", proxy_tags))
     outbounds.append(selector("🎥 TikTok", ai_tags))
-    outbounds.append(selector("🎥 YouTube", youtube_tags))
+    outbounds.append(selector("🎥 YouTube", proxy_tags))
 
     outbounds.append(selector("🐱 懒猫微服", lazycat_tags))
     outbounds.append(selector("🔍 调试出口", mitm_tags))
@@ -701,18 +719,12 @@ def proxies_to_outbound(
     outbounds.append(selector("👻 透明代理", ["DIRECT", "🔰 默认出口", "REJECT"]))
     outbounds.append(selector("🐟 漏网之鱼", ["🔰 默认出口", "DIRECT", "REJECT"]))
 
-    outbounds.append(
-        urltest("🤖 自然选择 Claude", costs, groups["🇺🇸 美国节点"], url="https://api.anthropic.com/", interval="1m")
-    )
-    outbounds.append(
-        urltest(
-            "🤖 自然选择 ChatGPT",
-            costs,
-            [*groups["🇺🇸 美国节点"], *groups["🇯🇵 日本节点"]],
-            url="https://api.openai.com/",
-            interval="1m",
-        )
-    )
+    us_tags = groups["🇺🇸 美国节点"]
+    us_jp_tags = [*groups["🇺🇸 美国节点"], *groups["🇯🇵 日本节点"]]
+    ai_costs = {**costs, "⛰️ Gingkoo": inf}
+    outbounds.append(urltest("🤖 自然选择 AI", ai_costs, us_jp_tags, url="https://gemini.google/"))
+    outbounds.append(urltest("🤖 自然选择 Claude", ai_costs, us_tags, url="https://api.anthropic.com/", interval="1m"))
+    outbounds.append(urltest("🤖 自然选择 ChatGPT", ai_costs, us_jp_tags, url="https://api.openai.com/", interval="1m"))
 
     emitted_providers: set[str] = set()
     for tag, nodes in providers.items():
@@ -879,6 +891,7 @@ def to_sing(
 ) -> Object:
     outbounds, domains, ips, embies = proxies_to_outbound(local, proxies, saved_countries, overwrite_country)
     return {
+        "$schema": "https://sing-box.sagernet.org/schema.json",
         "outbounds": outbounds,
         "route": {
             "rules": [
@@ -1008,6 +1021,7 @@ class ConfigFile:
     format: str = "clash"
     info: ConfigInfo = None
     emby: ConfigEmby = None
+    sort: str = None
 
 
 def load_config_files(path: Path) -> list[ConfigFile]:
@@ -1082,11 +1096,13 @@ def load_sing_box_proxies(path: Path) -> list[Object]:
         config = json.load(f)
     if "outbounds" not in config:
         return []
-    return [
-        {"name": outbound["tag"], "server": outbound["server"], "outbound": outbound}
-        for outbound in config["outbounds"]
-        if outbound["type"] not in ("direct", "selector", "urltest")
+    outbounds = [
+        outbound for outbound in config["outbounds"] if outbound["type"] not in ("direct", "selector", "urltest")
     ]
+    # 订阅顶层下发的自签 CA，只取 outbounds 会丢掉它
+    if pems := config.get("certificate", {}).get("certificate"):
+        attach_certificates(outbounds, [pems] if isinstance(pems, str) else pems)
+    return [{"name": outbound["tag"], "server": outbound["server"], "outbound": outbound} for outbound in outbounds]
 
 
 def load_proxies(config: ConfigFile) -> list[Object]:
@@ -1111,6 +1127,8 @@ def load_proxies(config: ConfigFile) -> list[Object]:
             }
         proxy["cost"] = config.cost
         proxy["format"] = config.format
+    if config.sort:
+        proxies = sort_by_variant(proxies, config.sort, key=lambda proxy: str(proxy["name"]))
     return proxies
 
 

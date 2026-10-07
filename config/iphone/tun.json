@@ -1,12 +1,11 @@
 {
+  "$schema": "https://sing-box.sagernet.org/schema.json",
   "inbounds": [
     {
       "type": "tun",
       "tag": "tun-in",
-      "address": [
-        "11.0.0.1/30",
-        "fdfe:dcba:9876::1/126"
-      ],
+      "address": ["11.0.0.1/30", "fdfe:dcba:9876::1/126"],
+      "loopback_address": "10.7.0.1",
       "auto_route": true,
       "strict_route": true,
       "platform": {
@@ -18,7 +17,10 @@
             "localhost",
             "arpa",
             "local",
+            "test",
             "gingkoo.com",
+            "gingkoo.internal",
+            "gingkoo.work",
             "server.gingkoo"
           ]
         }

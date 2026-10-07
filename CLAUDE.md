@@ -17,6 +17,7 @@ sing-box 规则集生成工具，基于 [Loyalsoldier/v2ray-rules-dat](https://g
 | `clash-download.sh <list>` | 批量下载 Clash 规则列表 |
 | `clash-merge.sh [--enable-process] <dir>` | 合并目录内 Clash 规则到 sing rule-set |
 | `commit-and-push.sh` | 提交并推送 rules/ 目录更改 |
+| `trim-history.sh [--threshold N] [--keep-days D] [--dry-run] <dir>` | 提交数超阈值时精简 git 历史并强制推送（默认 250 提交 / 保留 30 天） |
 | `npm-publish.sh` | 发布到 npm（`@dkmoonfruit/sing-rules`） |
 
 ## Python 脚本
@@ -37,6 +38,7 @@ sing-box 规则集生成工具，基于 [Loyalsoldier/v2ray-rules-dat](https://g
 - `io.py`：`open_path`（支持 `-` 标准输入/输出）
 - `object.py`：`as_hashable`、`copy_without_tag`、`simplify_dict`
 - `outbound.py`：`safe_find_country`（IP 归属地检测）
+- `sort.py`：`sort_by_variant`（按正则 base/variant 把节点的入口变种排在一起）
 - `yaml.py`：PyYAML 封装
 
 ## 目录结构
@@ -44,7 +46,7 @@ sing-box 规则集生成工具，基于 [Loyalsoldier/v2ray-rules-dat](https://g
 ```
 config/         # 订阅配置（config.json 定义数据源）
   iphone/       # iPhone 专用配置片段
-config/config.json # 订阅列表（ConfigFile 格式，含 name/cost/format/emby）
+config/config.json # 订阅列表（ConfigFile 格式，含 name/cost/format/sort/emby）
 dat/            # v2ray 原始 geo 数据（geoip.dat / geosite.dat）
 preflight/      # 预处理脚本及 saved-countries.json（节点国家缓存）
 rules/          # 输出目录：*.json（源码格式）+ *.srs（二进制格式）
@@ -94,4 +96,7 @@ zoo/            # 额外规则资源
 - 成本标记：`cost < 1.5` 为省流节点（🛢️），`cost > 1` 为高级节点（👍）
 - 协议标记：hy2（🌪️）、ss（🚀）、trojan（🐴）、tuic（🦬）、vless（🦢）、vmess（🐙）
 - 国家检测：`preflight/saved-countries.json` 缓存节点归属地
+- 订阅自带 CA：sing-box 订阅顶层 `certificate.certificate` 下发的自签 CA（NanoCloud 的 `www.bing.com`），
+  由 `common/certificate.py` 按 SAN 匹配 `server_name` 下放到出站 `tls.certificate`；
+  不合并到全局（等于让机场能对该域名做中间人），也不给其它出站加（出站级 certificate 会替换系统信任根）
 - CDN：规则集通过 `fastly.jsdelivr.net` 分发（或 Gitee 私有）
